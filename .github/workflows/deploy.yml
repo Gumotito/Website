@@ -15,6 +15,11 @@ jobs:
       env:
         PA_USERNAME: ${{ secrets.PA_USERNAME }}
         PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        PA_SSH_KEY: ${{ secrets.PA_SSH_KEY }}
       run: |
-        curl -X POST https://www.pythonanywhere.com/api/v0/user/${PA_USERNAME}/webapps/${PA_USERNAME}.pythonanywhere.com/reload/ \
+        mkdir -p ~/.ssh
+        echo "$PA_SSH_KEY" > ~/.ssh/pa_key
+        chmod 600 ~/.ssh/pa_key
+        ssh -i ~/.ssh/pa_key -o StrictHostKeyChecking=no ${PA_USERNAME}@ssh.pythonanywhere.com "cd ~/website && git pull origin main && /home/${PA_USERNAME}/.venv/bin/pip install -r requirements.txt"
+        curl -X POST https://www.pythonanywhere.com/api/v0/user/${PA_USERNAME}/webapps/gumotito.pythonanywhere.com/reload/ \
           -H "Authorization: Token ${PA_API_TOKEN}"
