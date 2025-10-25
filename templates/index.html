@@ -106,6 +106,7 @@
                 lastOrder = mailText;
                 lastStockCheck = data.response;
                 document.getElementById('mailResponse').textContent = data.response;
+                document.getElementById('mailInput').value = '';  // Clear input
                 updateAgent3();
             })
             .catch(error => console.error('Error:', error));
@@ -128,6 +129,7 @@
             .then(response => response.json())
             .then(data => {
                 document.getElementById('stockResponse').textContent = data.response;
+                document.getElementById('stockInput').value = '';  // Clear input
                 updateAgent3();
             })
             .catch(error => console.error('Error:', error));
@@ -152,6 +154,7 @@
                 lastPaymentOrder = data.payment_order;
                 document.getElementById('paymentResponse').textContent = data.payment_order;
                 document.getElementById('payButton').style.display = 'block';
+                document.getElementById('approveOrder').style.display = 'none';  // Hide approve button
             });
         });
 
