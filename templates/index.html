@@ -10,6 +10,8 @@
     <div class="container">
         <button id="myButton">Is Dorin a chele?</button>
         <div id="answer"></div>
+        <button id="askButton">Ask Agent</button>
+        <div id="agentResponse"></div>
     </div>
     
     <div id="allAnswers"></div>
@@ -28,7 +30,9 @@
             const container = document.getElementById('allAnswers');
             container.innerHTML = '';
             
-            responses.forEach(response => {
+            const shuffled = [...responses].sort(() => Math.random() - 0.5);
+            
+            shuffled.forEach(response => {
                 const div = document.createElement('div');
                 div.className = 'answer-box';
                 div.textContent = response;
@@ -44,6 +48,14 @@
                 container.appendChild(div);
             });
         }
+
+        document.getElementById('askButton').addEventListener('click', function() {
+            fetch('/ask-agent/Is%20Dorin%20a%20chele%3F')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('agentResponse').textContent = data.response || data.error;
+                });
+        });
     </script>
 </body>
 </html>
