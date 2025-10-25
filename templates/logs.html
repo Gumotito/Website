@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Logs</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="logs-container">
+        <h1>Order Management Logs</h1>
+        
+        <div class="logs-navigation">
+            <a href="/">← Back to Dashboard</a>
+        </div>
+
+        <div class="logs-grid">
+            <div class="log-section">
+                <h2>📥 Orders Received</h2>
+                <div id="receivedOrders" class="log-box"></div>
+            </div>
+
+            <div class="log-section">
+                <h2>✅ Orders Approved</h2>
+                <div id="approvedOrders" class="log-box"></div>
+            </div>
+
+            <div class="log-section">
+                <h2>💳 Awaiting Payment</h2>
+                <div id="awaitingPaymentOrders" class="log-box"></div>
+            </div>
+
+            <div class="log-section">
+                <h2>💰 Paid - Awaiting Delivery</h2>
+                <div id="awaitingDeliveryOrders" class="log-box"></div>
+            </div>
+
+            <div class="log-section">
+                <h2>🚚 Orders Delivered</h2>
+                <div id="deliveredOrders" class="log-box"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function loadLogs() {
+            fetch('/api/logs')
+                .then(response => response.json())
+                .then(data => {
+                    displayLogs('receivedOrders', data.received);
+                    displayLogs('approvedOrders', data.approved);
+                    displayLogs('awaitingPaymentOrders', data.awaiting_payment);
+                    displayLogs('awaitingDeliveryOrders', data.awaiting_delivery);
+                    displayLogs('deliveredOrders', data.delivered);
+                })
+                .catch(error => console.error('Error loading logs:', error));
+        }
+
+        function displayLogs(elementId, logs) {
+            const element = document.getElementById(elementId);
+            if (logs.length === 0) {
+                element.innerHTML = '<p class="no-logs">No logs yet</p>';
+                return;
+            }
+
+            element.innerHTML = logs.map((log, index) => `
+                <div class="log-item">
+                    <div class="log-header">
+                        <span class="log-id">#${index + 1}</span>
+                        <span class="log-time">${log.timestamp}</span>
+                    </div>
+                    <div class="log-content">
+                        <p><strong>Order:</strong> ${log.order}</p>
+                        <p><strong>Status:</strong> ${log.status}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Load logs on page load
+        loadLogs();
+
+        // Refresh logs every 5 seconds
+        setInterval(loadLogs, 5000);
+    </script>
+</body>
+</html>

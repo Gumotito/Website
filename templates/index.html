@@ -3,58 +3,188 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Is Dorin a chele?</title>
+    <title>Four Agents</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <button id="myButton">Is Dorin a chele?</button>
-        <div id="answer"></div>
-        <button id="askButton">Ask Agent</button>
-        <div id="agentResponse"></div>
+    <div class="dashboard-header">
+        <a href="/logs" class="logs-link">📋 View Logs</a>
     </div>
-    
-    <div id="allAnswers"></div>
+    <div class="grid-container">
+        <div class="agent-zone agent-1" id="agent1">
+            <div class="agent-split">
+                <div class="agent-upper">
+                    <h2>Agent 1 - Mail Interface</h2>
+                    <textarea id="mailInput" placeholder="Enter your order here...&#10;Format: Product A:5, Product B:10"></textarea>
+                    <button id="sendMail">Send Order</button>
+                </div>
+                <div class="agent-middle">
+                    <h3>Stock Verification</h3>
+                    <div id="mailResponse" class="response-box"></div>
+                </div>
+                <div class="agent-middle">
+                    <h3>Payment Order</h3>
+                    <div id="paymentResponse" class="response-box"></div>
+                    <button id="payButton" style="display:none;">Pay Now</button>
+                </div>
+                <div class="agent-lower">
+                    <h3>Delivery Confirmation</h3>
+                    <div id="deliveryConfirmation" class="response-box"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="agent-zone agent-2" id="agent2">
+            <div class="agent-split">
+                <div class="agent-upper">
+                    <h2>Agent 2 - Warehouse</h2>
+                    <textarea id="stockInput" placeholder="Enter stock here...&#10;Format: Product A:10units, Product B:15units"></textarea>
+                    <button id="updateStock">Update Stock</button>
+                </div>
+                <div class="agent-lower">
+                    <h3>Current Stock</h3>
+                    <div id="stockResponse" class="response-box"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="agent-zone agent-3" id="agent3">
+            <div class="agent-split">
+                <div class="agent-upper">
+                    <h3>Order Details</h3>
+                    <div id="orderDisplay" class="response-box"></div>
+                </div>
+                <div class="agent-lower">
+                    <h3>Stock Check</h3>
+                    <div id="approvalDisplay" class="response-box"></div>
+                    <button id="approveOrder" style="display:none;">Approve Order</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="agent-zone agent-4" id="agent4">
+            <div class="agent-split">
+                <div class="agent-upper">
+                    <h2>Agent 4 - Delivery/Shipping</h2>
+                    <h3>Order to Deliver</h3>
+                    <div id="deliveryOrder" class="response-box"></div>
+                </div>
+                <div class="agent-middle">
+                    <h3>Payment Confirmed</h3>
+                    <div id="paymentConfirmed" class="response-box"></div>
+                </div>
+                <div class="agent-lower">
+                    <h3>Warehouse Stock</h3>
+                    <div id="warehouseDetails" class="response-box"></div>
+                    <button id="fulfilledButton" style="display:none;">Mark as Fulfilled</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
-        document.getElementById('myButton').addEventListener('click', function() {
-            fetch('/show-text')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('answer').textContent = data.text;
-                    displayAllAnswers(data.all_responses);
-                });
+        let lastOrder = '';
+        let lastStockCheck = '';
+        let lastPaymentOrder = '';
+
+        document.getElementById('sendMail').addEventListener('click', function() {
+            const mailText = document.getElementById('mailInput').value;
+            if (mailText.trim() === '') {
+                alert('Please enter a mail order');
+                return;
+            }
+            
+            fetch('/agent/1/mail', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ mail: mailText })
+            })
+            .then(response => response.json())
+            .then(data => {
+                lastOrder = mailText;
+                lastStockCheck = data.response;
+                document.getElementById('mailResponse').textContent = data.response;
+                updateAgent3();
+            })
+            .catch(error => console.error('Error:', error));
         });
 
-        function displayAllAnswers(responses) {
-            const container = document.getElementById('allAnswers');
-            container.innerHTML = '';
+        document.getElementById('updateStock').addEventListener('click', function() {
+            const stockText = document.getElementById('stockInput').value;
+            if (stockText.trim() === '') {
+                alert('Please enter stock information');
+                return;
+            }
             
-            const shuffled = [...responses].sort(() => Math.random() - 0.5);
-            
-            shuffled.forEach(response => {
-                const div = document.createElement('div');
-                div.className = 'answer-box';
-                div.textContent = response;
-                
-                const randomX = Math.random() * 80;
-                const randomY = Math.random() * 80;
-                const randomRotation = Math.random() * 20 - 10;
-                
-                div.style.left = randomX + '%';
-                div.style.top = randomY + '%';
-                div.style.transform = `rotate(${randomRotation}deg)`;
-                
-                container.appendChild(div);
-            });
+            fetch('/agent/2/warehouse', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ stock: stockText })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('stockResponse').textContent = data.response;
+                updateAgent3();
+            })
+            .catch(error => console.error('Error:', error));
+        });
+
+        function updateAgent3() {
+            document.getElementById('orderDisplay').textContent = lastOrder;
+            document.getElementById('approvalDisplay').textContent = lastStockCheck;
+            document.getElementById('approveOrder').style.display = 'block';
         }
 
-        document.getElementById('askButton').addEventListener('click', function() {
-            fetch('/ask-agent/Is%20Dorin%20a%20chele%3F')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('agentResponse').textContent = data.response || data.error;
-                });
+        document.getElementById('approveOrder').addEventListener('click', function() {
+            fetch('/agent/3/approve', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ order: lastOrder })
+            })
+            .then(response => response.json())
+            .then(data => {
+                lastPaymentOrder = data.payment_order;
+                document.getElementById('paymentResponse').textContent = data.payment_order;
+                document.getElementById('payButton').style.display = 'block';
+            });
+        });
+
+        document.getElementById('payButton').addEventListener('click', function() {
+            document.getElementById('paymentResponse').textContent = 'Payment Completed!';
+            document.getElementById('payButton').style.display = 'none';
+            updateAgent4();
+        });
+
+        function updateAgent4() {
+            document.getElementById('deliveryOrder').textContent = lastOrder;
+            document.getElementById('paymentConfirmed').textContent = lastPaymentOrder;
+            document.getElementById('warehouseDetails').textContent = document.getElementById('stockResponse').textContent;
+            document.getElementById('fulfilledButton').style.display = 'block';
+        }
+
+        document.getElementById('fulfilledButton').addEventListener('click', function() {
+            fetch('/agent/4/fulfilled', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    order: lastOrder,
+                    payment: lastPaymentOrder
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('stockResponse').textContent = data.updated_stock;
+                document.getElementById('deliveryConfirmation').textContent = data.confirmation;
+                document.getElementById('fulfilledButton').style.display = 'none';
+            });
         });
     </script>
 </body>
