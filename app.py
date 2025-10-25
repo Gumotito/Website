@@ -1,4 +1,5 @@
 from flask import Flask, render_template, jsonify
+import random
 
 app = Flask(__name__)
 
@@ -12,7 +13,7 @@ responses = [
     'Definitely'
 ]
 
-response_index = 0
+clicked_responses = []
 
 @app.route('/')
 def index():
@@ -20,10 +21,10 @@ def index():
 
 @app.route('/show-text')
 def show_text():
-    global response_index
-    text = responses[response_index % len(responses)]
-    response_index += 1
-    return jsonify({'text': text})
+    global clicked_responses
+    text = responses[len(clicked_responses) % len(responses)]
+    clicked_responses.append(text)
+    return jsonify({'text': text, 'all_responses': clicked_responses})
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -11,6 +11,8 @@
         <button id="myButton">Is Dorin a chele?</button>
         <div id="answer"></div>
     </div>
+    
+    <div id="allAnswers"></div>
 
     <script>
         document.getElementById('myButton').addEventListener('click', function() {
@@ -18,8 +20,30 @@
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('answer').textContent = data.text;
+                    displayAllAnswers(data.all_responses);
                 });
         });
+
+        function displayAllAnswers(responses) {
+            const container = document.getElementById('allAnswers');
+            container.innerHTML = '';
+            
+            responses.forEach(response => {
+                const div = document.createElement('div');
+                div.className = 'answer-box';
+                div.textContent = response;
+                
+                const randomX = Math.random() * 80;
+                const randomY = Math.random() * 80;
+                const randomRotation = Math.random() * 20 - 10;
+                
+                div.style.left = randomX + '%';
+                div.style.top = randomY + '%';
+                div.style.transform = `rotate(${randomRotation}deg)`;
+                
+                container.appendChild(div);
+            });
+        }
     </script>
 </body>
 </html>
