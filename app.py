@@ -1,18 +1,28 @@
 from flask import Flask, render_template, jsonify, request
 from datetime import datetime
-from langsmith import traceable
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Load from environment variables only - NO HARDCODED SECRETS
+# Try to import langsmith, but make it optional
+try:
+    from langsmith import traceable
+    LANGSMITH_AVAILABLE = True
+except ImportError:
+    LANGSMITH_AVAILABLE = False
+    # Create a dummy decorator if langsmith is not available
+    def traceable(name=None):
+        def decorator(func):
+            return func
+        return decorator
+
+# Load from environment variables only
 LANGCHAIN_TRACING = os.getenv('LANGCHAIN_TRACING_V2', 'false')
 LANGCHAIN_API_KEY = os.getenv('LANGCHAIN_API_KEY')
 LANGCHAIN_PROJECT = os.getenv('LANGCHAIN_PROJECT')
 
-# Only set if API key exists
-if LANGCHAIN_API_KEY:
+if LANGCHAIN_API_KEY and LANGSMITH_AVAILABLE:
     os.environ['LANGCHAIN_TRACING_V2'] = LANGCHAIN_TRACING
     os.environ['LANGCHAIN_API_KEY'] = LANGCHAIN_API_KEY
     os.environ['LANGCHAIN_PROJECT'] = LANGCHAIN_PROJECT or 'website-agents'
