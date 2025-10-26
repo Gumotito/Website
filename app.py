@@ -2,6 +2,10 @@ from flask import Flask, render_template, jsonify, request
 from datetime import datetime
 import os
 from dotenv import load_dotenv
+import json
+import sqlite3
+from flask_cors import CORS
+from functools import wraps
 
 load_dotenv()
 
@@ -28,9 +32,38 @@ if LANGCHAIN_API_KEY and LANGSMITH_AVAILABLE:
     os.environ['LANGCHAIN_PROJECT'] = LANGCHAIN_PROJECT or 'website-agents'
 
 app = Flask(__name__)
+CORS(app)
 
-# Store current stock
+# Add validation decorator FIRST (before routes)
+def validate_json(*required_fields):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'Invalid JSON'}), 400
+            for field in required_fields:
+                if field not in data or not data[field]:
+                    return jsonify({'error': f'{field} is required'}), 400
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+# Current (loses data on restart)
 current_stock = {}
+
+# Recommended: Add persistence
+def save_stock():
+    with open('stock.json', 'w') as f:
+        json.dump(current_stock, f)
+
+def load_stock():
+    global current_stock
+    try:
+        with open('stock.json', 'r') as f:
+            current_stock = json.load(f)
+    except FileNotFoundError:
+        current_stock = {}
 
 # Store logs
 order_logs = {
@@ -40,28 +73,6 @@ order_logs = {
     'awaiting_delivery': [],
     'delivered': []
 }
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/logs')
-def logs():
-    return render_template('logs.html')
-
-@app.route('/api/logs')
-def get_logs():
-    return jsonify(order_logs)
-
-@app.route('/agent/<int:agent_id>')
-def get_agent(agent_id):
-    agents_data = {
-        1: {'name': 'Agent 1', 'description': 'Mail Interface'},
-        2: {'name': 'Agent 2', 'description': 'Warehouse'},
-        3: {'name': 'Agent 3', 'description': 'Area 3 content'},
-        4: {'name': 'Agent 4', 'description': 'Area 4 content'}
-    }
-    return jsonify(agents_data.get(agent_id, {}))
 
 @traceable(name="Agent 1 - Mail Processing")
 def mail_agent_traced(mail_text):
@@ -117,7 +128,10 @@ def fulfilled_delivery_traced(order):
         if item and ':' in item:
             prod_name, qty_str = item.split(':')
             prod_name = prod_name.strip()
-            qty_ordered = int(''.join(filter(str.isdigit, qty_str.strip())))
+            try:
+                qty_ordered = int(''.join(filter(str.isdigit, qty_str.strip())))
+            except ValueError:
+                return jsonify({'error': 'Invalid quantity format'}), 400
             if prod_name in current_stock:
                 current_stock[prod_name] -= qty_ordered
     return f"Order Fulfilled: {order}"
@@ -158,7 +172,7 @@ def generate_insights():
         insights.append(f"📦 Low stock items: {', '.join(metrics['low_stock_items'])} - Reorder soon")
     
     # Performance insights
-    if metrics['total_delivered'] > 0:
+    if metrics['total_received'] > 0 and metrics['total_delivered'] > 0:
         delivery_rate = (metrics['total_delivered'] / metrics['total_received']) * 100
         insights.append(f"✅ Delivery rate: {delivery_rate:.1f}%")
     
@@ -232,20 +246,77 @@ def get_recommendations():
     
     return jsonify({'recommendations': recommendations})
 
+def check_stock(products):
+    result = "Stock Check:\n"
+    # Parse comma-separated format: Product A:5, Product B:10
+    items = products.split(',')
+    for item in items:
+        item = item.strip()
+        if item and ':' in item:
+            prod_name, qty_str = item.split(':')
+            prod_name = prod_name.strip()
+            qty_needed = int(''.join(filter(str.isdigit, qty_str.strip())))
+            qty_available = current_stock.get(prod_name, 0)
+            status = "✓ Available" if qty_available >= qty_needed else "✗ Insufficient"
+            result += f"{prod_name}: Need {qty_needed}, Have {qty_available} {status}\n"
+    return result
+
+def init_db():
+    conn = sqlite3.connect('orders.db')
+    conn.execute('''CREATE TABLE IF NOT EXISTS orders
+        (id INTEGER PRIMARY KEY, order_text TEXT, status TEXT, timestamp TEXT)''')
+    conn.commit()
+    conn.close()
+
+# Load stock on startup BEFORE routes
+load_stock()
+init_db()
+
+# NOW define routes AFTER everything is initialized
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/logs')
+def logs():
+    return render_template('logs.html')
+
+@app.route('/api/logs')
+def get_logs():
+    return jsonify(order_logs)
+
+@app.route('/agent/<int:agent_id>')
+def get_agent(agent_id):
+    agents_data = {
+        1: {'name': 'Agent 1', 'description': 'Mail Interface'},
+        2: {'name': 'Agent 2', 'description': 'Warehouse'},
+        3: {'name': 'Agent 3', 'description': 'Area 3 content'},
+        4: {'name': 'Agent 4', 'description': 'Area 4 content'}
+    }
+    return jsonify(agents_data.get(agent_id, {}))
+
 @app.route('/agent/1/mail', methods=['POST'])
+@validate_json('mail')
 def mail_agent():
     data = request.json
-    mail_text = data.get('mail', '')
+    mail_text = data.get('mail', '').strip()
+    if len(mail_text) < 3:
+        return jsonify({'error': 'Mail text too short'}), 400
     response = mail_agent_traced(mail_text)
     return jsonify({'response': response})
 
 @app.route('/agent/2/warehouse', methods=['POST'])
+@validate_json('stock')
 def warehouse_agent():
     data = request.json
     stock_text = data.get('stock', '')
-    warehouse_agent_traced(stock_text)
-    stock_summary = "\n".join([f"{product}: {qty} units" for product, qty in current_stock.items()])
-    return jsonify({'response': f"Stock Updated:\n\n{stock_summary}"})
+    try:
+        warehouse_agent_traced(stock_text)
+        save_stock()  # Persist after update
+        stock_summary = "\n".join([f"{product}: {qty} units" for product, qty in current_stock.items()])
+        return jsonify({'response': f"Stock Updated:\n\n{stock_summary}"})
+    except ValueError as e:
+        return jsonify({'error': f'Invalid stock format: {str(e)}'}), 400
 
 @app.route('/agent/3/approve', methods=['POST'])
 def approve_order():
@@ -280,21 +351,6 @@ def delivery_complete():
     })
     
     return jsonify({'success': True})
-
-def check_stock(products):
-    result = "Stock Check:\n"
-    # Parse comma-separated format: Product A:5, Product B:10
-    items = products.split(',')
-    for item in items:
-        item = item.strip()
-        if item and ':' in item:
-            prod_name, qty_str = item.split(':')
-            prod_name = prod_name.strip()
-            qty_needed = int(''.join(filter(str.isdigit, qty_str.strip())))
-            qty_available = current_stock.get(prod_name, 0)
-            status = "✓ Available" if qty_available >= qty_needed else "✗ Insufficient"
-            result += f"{prod_name}: Need {qty_needed}, Have {qty_available} {status}\n"
-    return result
 
 if __name__ == '__main__':
     app.run(debug=True)
