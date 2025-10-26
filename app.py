@@ -2,12 +2,16 @@ from flask import Flask, render_template, jsonify, request
 from datetime import datetime
 from langsmith import traceable
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Set defaults if env vars not found
+os.environ.setdefault('LANGCHAIN_TRACING_V2', 'true')
+os.environ.setdefault('LANGCHAIN_API_KEY', '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')
+os.environ.setdefault('LANGCHAIN_PROJECT', 'website-agents')
 
 app = Flask(__name__)
-
-# LangSmith setup
-os.environ['LANGCHAIN_TRACING_V2'] = 'true'
-os.environ['LANGCHAIN_PROJECT'] = 'website-agents'
 
 # Store current stock
 current_stock = {}
