@@ -1,7 +1,13 @@
 from flask import Flask, render_template, jsonify, request
 from datetime import datetime
+from langsmith import traceable
+import os
 
 app = Flask(__name__)
+
+# LangSmith setup
+os.environ['LANGCHAIN_TRACING_V2'] = 'true'
+os.environ['LANGCHAIN_PROJECT'] = 'website-agents'
 
 # Store current stock
 current_stock = {}
@@ -37,85 +43,54 @@ def get_agent(agent_id):
     }
     return jsonify(agents_data.get(agent_id, {}))
 
-@app.route('/agent/1/mail', methods=['POST'])
-def mail_agent():
-    data = request.json
-    mail_text = data.get('mail', '')
-    
-    # Log received order
+@traceable(name="Agent 1 - Mail Processing")
+def mail_agent_traced(mail_text):
+    """Agent 1: Process incoming mail orders"""
     order_logs['received'].append({
         'order': mail_text,
         'status': 'Received',
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     })
-    
-    # Parse order and check stock
     order_check = check_stock(mail_text)
-    
-    response = f"Order Received:\n\n{mail_text}\n\n--- Stock Verification ---\n{order_check}"
-    
-    return jsonify({'response': response})
+    return f"Order Received:\n\n{mail_text}\n\n--- Stock Verification ---\n{order_check}"
 
-@app.route('/agent/2/warehouse', methods=['POST'])
-def warehouse_agent():
-    global current_stock
-    data = request.json
-    stock_text = data.get('stock', '')
-    
-    # Parse stock format: Product A: 10units, Product B: 10units
+@traceable(name="Agent 2 - Stock Update")
+def warehouse_agent_traced(stock_text):
+    """Agent 2: Update warehouse stock"""
     items = stock_text.split(',')
+    updated_items = []
     for item in items:
         if ':' in item:
             product, qty_str = item.split(':')
             product = product.strip()
-            # Extract number from qty_str (e.g., "10units" -> 10)
             qty = int(''.join(filter(str.isdigit, qty_str.strip())))
             current_stock[product] = qty
-    
-    stock_summary = "\n".join([f"{product}: {qty} units" for product, qty in current_stock.items()])
-    response = f"Stock Updated:\n\n{stock_summary}"
-    
-    return jsonify({'response': response})
+            updated_items.append(f"{product}: {qty}")
+    return "\n".join(updated_items)
 
-@app.route('/agent/3/approve', methods=['POST'])
-def approve_order():
-    data = request.json
-    order = data.get('order', '')
-    
-    # Log approved order
+@traceable(name="Agent 3 - Order Approval")
+def approve_order_traced(order):
+    """Agent 3: Approve orders"""
     order_logs['approved'].append({
         'order': order,
         'status': 'Approved',
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     })
-    
-    # Add to awaiting payment
     order_logs['awaiting_payment'].append({
         'order': order,
         'status': 'Awaiting Payment',
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     })
-    
-    payment_order = f"Payment Order\n\n{order}\n\nTotal: Calculate based on order\n\nClick 'Pay Now' to proceed"
-    
-    response = f"Order Approved and Confirmed:\n\n{order}\n\nProcessing payment and shipping..."
-    
-    return jsonify({'response': response, 'payment_order': payment_order})
+    return f"Order Approved: {order}"
 
-@app.route('/agent/4/fulfilled', methods=['POST'])
-def fulfilled_delivery():
-    global current_stock
-    data = request.json
-    order = data.get('order', '')
-    
-    # Add to awaiting delivery first
+@traceable(name="Agent 4 - Delivery Fulfillment")
+def fulfilled_delivery_traced(order):
+    """Agent 4: Fulfill and deliver orders"""
     order_logs['awaiting_delivery'].append({
         'order': order,
         'status': 'Awaiting Delivery',
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     })
-    
-    # Parse order and deduct from stock
     items = order.split(',')
     for item in items:
         item = item.strip()
@@ -125,16 +100,39 @@ def fulfilled_delivery():
             qty_ordered = int(''.join(filter(str.isdigit, qty_str.strip())))
             if prod_name in current_stock:
                 current_stock[prod_name] -= qty_ordered
-    
-    # Generate updated stock
+    return f"Order Fulfilled: {order}"
+
+@app.route('/agent/1/mail', methods=['POST'])
+def mail_agent():
+    data = request.json
+    mail_text = data.get('mail', '')
+    response = mail_agent_traced(mail_text)
+    return jsonify({'response': response})
+
+@app.route('/agent/2/warehouse', methods=['POST'])
+def warehouse_agent():
+    data = request.json
+    stock_text = data.get('stock', '')
+    warehouse_agent_traced(stock_text)
+    stock_summary = "\n".join([f"{product}: {qty} units" for product, qty in current_stock.items()])
+    return jsonify({'response': f"Stock Updated:\n\n{stock_summary}"})
+
+@app.route('/agent/3/approve', methods=['POST'])
+def approve_order():
+    data = request.json
+    order = data.get('order', '')
+    approve_order_traced(order)
+    payment_order = f"Payment Order\n\n{order}\n\nClick 'Pay Now' to proceed"
+    return jsonify({'response': f"Order Approved: {order}", 'payment_order': payment_order})
+
+@app.route('/agent/4/fulfilled', methods=['POST'])
+def fulfilled_delivery():
+    data = request.json
+    order = data.get('order', '')
+    fulfilled_delivery_traced(order)
     updated_stock = "\n".join([f"{product}: {qty} units" for product, qty in current_stock.items()])
-    
-    confirmation = f"Order Delivered Successfully!\n\n{order}\n\nThank you for your purchase!"
-    
-    return jsonify({
-        'confirmation': confirmation,
-        'updated_stock': updated_stock
-    })
+    confirmation = f"Order Delivered Successfully!\n\n{order}\n\nThank you!"
+    return jsonify({'confirmation': confirmation, 'updated_stock': updated_stock})
 
 @app.route('/agent/4/delivery-complete', methods=['POST'])
 def delivery_complete():
