@@ -102,6 +102,116 @@ def fulfilled_delivery_traced(order):
                 current_stock[prod_name] -= qty_ordered
     return f"Order Fulfilled: {order}"
 
+@traceable(name="Agent 5 - Flow Oversight")
+def oversee_flow():
+    """Agent 5: Monitor and analyze workflow performance"""
+    metrics = {
+        'total_received': len(order_logs['received']),
+        'total_approved': len(order_logs['approved']),
+        'total_paid': len(order_logs['awaiting_payment']) + len(order_logs['awaiting_delivery']) + len(order_logs['delivered']),
+        'total_delivered': len(order_logs['delivered']),
+        'pending_approval': len(order_logs['received']) - len(order_logs['approved']),
+        'pending_payment': len(order_logs['awaiting_payment']),
+        'pending_delivery': len(order_logs['awaiting_delivery']),
+        'current_stock_value': sum(current_stock.values()),
+        'low_stock_items': [item for item, qty in current_stock.items() if qty < 5]
+    }
+    return metrics
+
+def generate_insights():
+    """Generate improvement recommendations"""
+    metrics = oversee_flow()
+    insights = []
+    
+    # Check for bottlenecks
+    if metrics['pending_approval'] > 2:
+        insights.append("⚠️  Multiple orders awaiting approval - consider faster approval process")
+    
+    if metrics['pending_payment'] > 3:
+        insights.append("⚠️  Multiple orders awaiting payment - send payment reminders")
+    
+    if metrics['pending_delivery'] > 2:
+        insights.append("⚠️  Delivery backlog detected - allocate more resources")
+    
+    # Stock warnings
+    if metrics['low_stock_items']:
+        insights.append(f"📦 Low stock items: {', '.join(metrics['low_stock_items'])} - Reorder soon")
+    
+    # Performance insights
+    if metrics['total_delivered'] > 0:
+        delivery_rate = (metrics['total_delivered'] / metrics['total_received']) * 100
+        insights.append(f"✅ Delivery rate: {delivery_rate:.1f}%")
+    
+    return insights
+
+@app.route('/agent/5/oversight', methods=['GET'])
+def get_oversight():
+    """Get workflow metrics and insights"""
+    metrics = oversee_flow()
+    insights = generate_insights()
+    
+    return jsonify({
+        'metrics': metrics,
+        'insights': insights,
+        'status': 'healthy' if not insights else 'warning'
+    })
+
+@app.route('/agent/5/recommendations', methods=['GET'])
+def get_recommendations():
+    """Get AI-powered improvement recommendations"""
+    metrics = oversee_flow()
+    recommendations = []
+    
+    # Efficiency recommendations
+    if metrics['total_approved'] > 0:
+        approval_rate = (metrics['total_approved'] / metrics['total_received']) * 100
+        if approval_rate < 80:
+            recommendations.append({
+                'category': 'Approval Process',
+                'improvement': 'Slow approval rate - Consider automated approval for standard orders',
+                'priority': 'high'
+            })
+    
+    # Payment recommendations
+    if metrics['pending_payment'] > 0:
+        recommendations.append({
+            'category': 'Payment',
+            'improvement': 'Implement payment reminders and multiple payment methods',
+            'priority': 'high' if metrics['pending_payment'] > 2 else 'medium'
+        })
+    
+    # Delivery recommendations
+    if metrics['pending_delivery'] > 1:
+        recommendations.append({
+            'category': 'Delivery',
+            'improvement': 'Consider partnering with multiple delivery providers',
+            'priority': 'high' if metrics['pending_delivery'] > 3 else 'medium'
+        })
+    
+    # Stock recommendations
+    if metrics['low_stock_items']:
+        recommendations.append({
+            'category': 'Inventory',
+            'improvement': f"Implement automated reordering for low-stock items",
+            'priority': 'high'
+        })
+    else:
+        recommendations.append({
+            'category': 'Inventory',
+            'improvement': 'Stock levels are healthy - Continue current inventory management',
+            'priority': 'low'
+        })
+    
+    # Capacity recommendations
+    if metrics['total_delivered'] > 10:
+        recommendations.append({
+            'category': 'Capacity',
+            'improvement': 'Scale up operations - Consider hiring additional staff',
+            'priority': 'medium'
+        })
+    
+    return jsonify({'recommendations': recommendations})
+
 @app.route('/agent/1/mail', methods=['POST'])
 def mail_agent():
     data = request.json

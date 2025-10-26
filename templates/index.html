@@ -80,6 +80,23 @@
                 </div>
             </div>
         </div>
+
+        <div class="agent-zone agent-5" id="agent5">
+            <div class="agent-split">
+                <div class="agent-upper">
+                    <h2>Agent 5 - Flow Oversight</h2>
+                    <button id="refreshMetrics">Refresh Metrics</button>
+                </div>
+                <div class="agent-middle">
+                    <h3>Performance Metrics</h3>
+                    <div id="metricsDisplay" class="response-box"></div>
+                </div>
+                <div class="agent-lower">
+                    <h3>Insights & Recommendations</h3>
+                    <div id="insightsDisplay" class="response-box"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -189,6 +206,45 @@
                 document.getElementById('fulfilledButton').style.display = 'none';
             });
         });
+
+        document.getElementById('refreshMetrics').addEventListener('click', function() {
+                Promise.all([
+                    fetch('/agent/5/oversight').then(r => r.json()),
+                    fetch('/agent/5/recommendations').then(r => r.json())
+                ])
+                .then(([oversightData, recommendationsData]) => {
+                    const metrics = oversightData.metrics;
+                    const metricsText = `
+Orders Received: ${metrics.total_received}
+Orders Approved: ${metrics.total_approved}
+Awaiting Payment: ${metrics.pending_payment}
+Awaiting Delivery: ${metrics.pending_delivery}
+Successfully Delivered: ${metrics.total_delivered}
+
+Stock Summary:
+Total Units: ${metrics.current_stock_value}
+Low Stock Items: ${metrics.low_stock_items.length > 0 ? metrics.low_stock_items.join(', ') : 'None'}
+                    `;
+                    
+                    const insightsText = oversightData.insights.join('\n') + '\n\n' +
+                        'Recommendations:\n' +
+                        recommendationsData.recommendations.map(r => 
+                            `[${r.priority.toUpperCase()}] ${r.category}: ${r.improvement}`
+                        ).join('\n');
+                    
+                    document.getElementById('metricsDisplay').textContent = metricsText;
+                    document.getElementById('insightsDisplay').textContent = insightsText;
+                })
+                .catch(error => console.error('Error:', error));
+            });
+
+            // Auto-refresh metrics every 30 seconds
+            setInterval(() => {
+                document.getElementById('refreshMetrics').click();
+            }, 30000);
+
+            // Initial load
+            document.getElementById('refreshMetrics').click();
     </script>
 </body>
 </html>
