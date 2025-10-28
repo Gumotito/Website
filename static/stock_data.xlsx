@@ -1,0 +1,16 @@
+Product,Quantity,Unit,Supplier,Last_Updated
+Laptop,50,units,TechSupply Co,2025-10-28
+Smartphone,120,units,MobileWorld,2025-10-28
+Tablet,75,units,TechSupply Co,2025-10-27
+Monitor,40,units,DisplayPro,2025-10-28
+Keyboard,200,units,PeripheralHub,2025-10-26
+Mouse,180,units,PeripheralHub,2025-10-26
+Headphones,95,units,AudioTech,2025-10-28
+Webcam,60,units,VideoGear,2025-10-27
+USB Cable,300,units,CableWorld,2025-10-25
+HDMI Cable,250,units,CableWorld,2025-10-25
+Desk Chair,30,units,OfficeFurniture,2025-10-28
+Standing Desk,15,units,OfficeFurniture,2025-10-27
+Printer,25,units,PrintSolutions,2025-10-28
+Router,45,units,NetworkPro,2025-10-27
+External SSD,85,units,StoragePlus,2025-10-28

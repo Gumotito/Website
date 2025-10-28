@@ -192,13 +192,27 @@
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ stock: stockText })
+                body: JSON.stringify({ action: 'manual_update', stock: stockText })
             })
             .then(response => response.json())
             .then(data => {
-                document.getElementById('stockResponse').textContent = data.response;
-                document.getElementById('stockInput').value = '';  // Clear input
-                updateAgent3();
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    let stockDisplay = data.message + '\n\n';
+                    
+                    // Display current stock
+                    if (data.current_stock) {
+                        stockDisplay += '📦 Current Stock:\n';
+                        for (const [product, quantity] of Object.entries(data.current_stock)) {
+                            stockDisplay += `   ${product}: ${quantity} units\n`;
+                        }
+                    }
+                    
+                    document.getElementById('stockResponse').textContent = stockDisplay;
+                    document.getElementById('stockInput').value = '';  // Clear input
+                    updateAgent3();
+                }
             })
             .catch(error => console.error('Error:', error));
         });
@@ -221,7 +235,22 @@
                 if (data.error) {
                     alert('Error: ' + data.error);
                 } else {
-                    document.getElementById('stockResponse').textContent = data.response;
+                    // Format the stock display
+                    let stockDisplay = data.message + '\n\n';
+                    
+                    if (data.change_summary && data.change_summary.length > 0) {
+                        stockDisplay += data.change_summary.join('\n') + '\n\n';
+                    }
+                    
+                    // Display current stock
+                    if (data.current_stock) {
+                        stockDisplay += '📦 Current Stock:\n';
+                        for (const [product, quantity] of Object.entries(data.current_stock)) {
+                            stockDisplay += `   ${product}: ${quantity} units\n`;
+                        }
+                    }
+                    
+                    document.getElementById('stockResponse').textContent = stockDisplay;
                     document.getElementById('lastReadTime').textContent = new Date().toLocaleTimeString();
                     updateAgent3();
                 }
@@ -254,10 +283,28 @@
             })
             .then(response => response.json())
             .then(data => {
-                if (!data.error && data.change_count > 0) {
-                    document.getElementById('stockResponse').textContent = data.response;
+                if (!data.error) {
+                    // Always update stock display, show changes if any
+                    let stockDisplay = data.message + '\n\n';
+                    
+                    if (data.change_summary && data.change_summary.length > 0) {
+                        stockDisplay += data.change_summary.join('\n') + '\n\n';
+                    }
+                    
+                    // Display current stock
+                    if (data.current_stock) {
+                        stockDisplay += '📦 Current Stock:\n';
+                        for (const [product, quantity] of Object.entries(data.current_stock)) {
+                            stockDisplay += `   ${product}: ${quantity} units\n`;
+                        }
+                    }
+                    
+                    document.getElementById('stockResponse').textContent = stockDisplay;
                     document.getElementById('lastReadTime').textContent = new Date().toLocaleTimeString() + ' (auto)';
-                    updateAgent3();
+                    
+                    if (data.change_count > 0) {
+                        updateAgent3();
+                    }
                 }
             })
             .catch(error => console.error('Auto-sync error:', error));
@@ -273,7 +320,7 @@
                 return;
             }
             
-            const requestBody = { api_url: apiUrl };
+            const requestBody = { action: 'fetch_api', api_url: apiUrl };
             if (apiKey) {
                 requestBody.api_key = apiKey;
             }
@@ -290,7 +337,17 @@
                 if (data.error) {
                     alert('Error: ' + data.error);
                 } else {
-                    document.getElementById('stockResponse').textContent = data.response;
+                    let stockDisplay = data.message + '\n\n';
+                    
+                    // Display current stock
+                    if (data.current_stock) {
+                        stockDisplay += '📦 Current Stock:\n';
+                        for (const [product, quantity] of Object.entries(data.current_stock)) {
+                            stockDisplay += `   ${product}: ${quantity} units\n`;
+                        }
+                    }
+                    
+                    document.getElementById('stockResponse').textContent = stockDisplay;
                     updateAgent3();
                 }
             })

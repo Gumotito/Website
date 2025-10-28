@@ -119,7 +119,13 @@ def sync_excel(excel_service) -> Dict:
         logger.error(f'Error in sync_excel: {e}', exc_info=True)
         return {
             'success': False,
-            'changes': {},
+            'changes': {
+                'added': {},
+                'removed': {},
+                'increased': {},
+                'decreased': {},
+                'unchanged': {}
+            },
             'change_count': 0,
             'error': str(e)
         }
