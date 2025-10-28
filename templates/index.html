@@ -38,11 +38,43 @@
             <div class="agent-split">
                 <div class="agent-upper">
                     <h2>Agent 2 - Warehouse</h2>
-                    <textarea id="stockInput" placeholder="Enter stock here...&#10;Format: Product A:10units, Product B:15units"></textarea>
-                    <button id="updateStock">Update Stock</button>
+                    
+                    <!-- Tab Selection -->
+                    <div style="margin-bottom: 10px;">
+                        <button class="tab-btn active" onclick="switchTab('excel')">Read Excel File</button>
+                        <button class="tab-btn" onclick="switchTab('manual')">Manual Entry</button>
+                        <button class="tab-btn" onclick="switchTab('api')">API Integration</button>
+                    </div>
+                    
+                    <!-- Excel Monitoring Tab -->
+                    <div id="excelTab" class="tab-content">
+                        <p style="font-size: 12px; margin: 5px 0;">
+                            🔄 <strong>Auto-monitoring:</strong> <code>stock_data.xlsx</code><br>
+                            System automatically detects file changes every 5 seconds<br>
+                            <span style="color: #28a745;">● Active</span>
+                        </p>
+                        <button id="readExcel">📊 Manual Sync Now</button>
+                        <p style="font-size: 11px; margin-top: 5px; color: #666;">
+                            Last sync: <span id="lastReadTime">Loading...</span>
+                        </p>
+                    </div>
+                    
+                    <!-- Manual Entry Tab -->
+                    <div id="manualTab" class="tab-content" style="display:none;">
+                        <textarea id="stockInput" placeholder="Enter stock here...&#10;Format: Product A:10units, Product B:15units"></textarea>
+                        <button id="updateStock">Update Stock</button>
+                    </div>
+                    
+                    <!-- API Integration Tab -->
+                    <div id="apiTab" class="tab-content" style="display:none;">
+                        <p style="font-size: 12px; margin: 5px 0;">API should return: [{"product": "Name", "quantity": 10}]</p>
+                        <input type="text" id="apiUrl" placeholder="API URL (e.g., https://api.example.com/stock)" style="width: 100%; margin-bottom: 5px;" />
+                        <input type="text" id="apiKey" placeholder="API Key (optional)" style="width: 100%; margin-bottom: 5px;" />
+                        <button id="fetchFromApi">Fetch from API</button>
+                    </div>
                 </div>
                 <div class="agent-lower">
-                    <h3>Current Stock</h3>
+                    <h3>Stock Changes & Current Inventory</h3>
                     <div id="stockResponse" class="response-box"></div>
                 </div>
             </div>
@@ -129,6 +161,25 @@
             .catch(error => console.error('Error:', error));
         });
 
+        // Tab switching for Agent 2
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.getElementById('manualTab').style.display = 'none';
+            document.getElementById('excelTab').style.display = 'none';
+            document.getElementById('apiTab').style.display = 'none';
+            
+            // Remove active class from all buttons
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            tabBtns.forEach(btn => btn.classList.remove('active'));
+            
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').style.display = 'block';
+            
+            // Add active class to clicked button
+            event.target.classList.add('active');
+        }
+
+        // Manual stock update (original)
         document.getElementById('updateStock').addEventListener('click', function() {
             const stockText = document.getElementById('stockInput').value;
             if (stockText.trim() === '') {
@@ -150,6 +201,103 @@
                 updateAgent3();
             })
             .catch(error => console.error('Error:', error));
+        });
+
+        // Read Excel file
+        document.getElementById('readExcel').addEventListener('click', function() {
+            const button = this;
+            button.disabled = true;
+            button.textContent = '📊 Syncing...';
+            
+            fetch('/agent/2/warehouse', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ action: 'read_excel' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    document.getElementById('stockResponse').textContent = data.response;
+                    document.getElementById('lastReadTime').textContent = new Date().toLocaleTimeString();
+                    updateAgent3();
+                }
+                button.disabled = false;
+                button.textContent = '📊 Manual Sync Now';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to read Excel file');
+                button.disabled = false;
+                button.textContent = '📊 Manual Sync Now';
+            });
+        });
+
+        // Auto-read Excel on page load
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                document.getElementById('readExcel').click();
+            }, 500);
+        });
+
+        // Poll for stock updates every 10 seconds
+        setInterval(() => {
+            fetch('/agent/2/warehouse', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ action: 'read_excel' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.error && data.change_count > 0) {
+                    document.getElementById('stockResponse').textContent = data.response;
+                    document.getElementById('lastReadTime').textContent = new Date().toLocaleTimeString() + ' (auto)';
+                    updateAgent3();
+                }
+            })
+            .catch(error => console.error('Auto-sync error:', error));
+        }, 10000);  // Check every 10 seconds
+
+        // Manual stock update (original)
+        document.getElementById('updateStock').addEventListener('click', function() {
+            const apiUrl = document.getElementById('apiUrl').value.trim();
+            const apiKey = document.getElementById('apiKey').value.trim();
+            
+            if (!apiUrl) {
+                alert('Please enter an API URL');
+                return;
+            }
+            
+            const requestBody = { api_url: apiUrl };
+            if (apiKey) {
+                requestBody.api_key = apiKey;
+            }
+            
+            fetch('/agent/2/warehouse', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    document.getElementById('stockResponse').textContent = data.response;
+                    updateAgent3();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('API fetch failed');
+            });
         });
 
         function updateAgent3() {
